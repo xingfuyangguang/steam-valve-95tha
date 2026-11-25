@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>补汽阀 95% THA 开点 · 交互演示</title>
+<style>
+  :root{
+    --bg:#0b1020; --panel:#131a2e; --line:#243049; --txt:#e8eefc; --dim:#8fa0bf;
+    --cy:#38bdf8; --am:#f5a524; --rd:#f87171; --gn:#34d399;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--txt);
+    font-family:"Microsoft YaHei","PingFang SC","Hiragino Sans GB",system-ui,sans-serif;}
+  .wrap{max-width:1180px;margin:0 auto;padding:26px 22px 18px;}
+  header h1{font-size:24px;margin:0 0 6px;letter-spacing:.5px;}
+  header p{margin:0;color:var(--dim);font-size:13px;line-height:1.6}
+  .main{display:grid;grid-template-columns:minmax(0,1fr) 268px;gap:18px;margin-top:18px}
+  .chartwrap{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px 8px 4px}
+  canvas{width:100%;height:auto;display:block;border-radius:8px}
+  aside{display:flex;flex-direction:column;gap:10px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 13px}
+  .card .k{font-size:12px;color:var(--dim);letter-spacing:.4px}
+  .card .v{font-size:22px;font-weight:700;margin-top:3px;font-variant-numeric:tabular-nums}
+  .card .v small{font-size:12px;font-weight:400;color:var(--dim);margin-left:4px}
+  .card .d{font-size:12px;margin-top:2px;color:var(--dim);font-variant-numeric:tabular-nums}
+  .gauge{display:flex;flex-direction:column;align-items:center}
+  .gauge canvas{width:150px;height:110px}
+  .gauge .lab{font-size:12px;color:var(--dim);margin-top:-6px}
+  .ctl{margin-top:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .row>span{font-size:13px;color:var(--dim);white-space:nowrap}
+  input[type=range]{-webkit-appearance:none;appearance:none;flex:1;min-width:220px;height:6px;border-radius:4px;
+    background:linear-gradient(90deg,#1c2740 0%,#1c2740 100%);outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;
+    background:var(--cy);border:3px solid #0b1020;box-shadow:0 0 0 1px #38bdf8aa;cursor:grab}
+  input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--cy);border:2px solid #0b1020;cursor:grab}
+  .val{font-variant-numeric:tabular-nums;font-weight:700;color:var(--cy);font-size:15px;min-width:74px;text-align:right}
+  button{background:#1b2438;color:var(--txt);border:1px solid var(--line);border-radius:9px;padding:7px 13px;
+    font-size:13px;cursor:pointer;transition:.15s;font-family:inherit}
+  button:hover{border-color:#38bdf8aa;color:#fff;background:#222d47}
+  button.on{border-color:var(--cy);color:var(--cy)}
+  .judge{margin-top:11px;font-size:13px;line-height:1.65;color:#cbd6ea;border-left:3px solid var(--cy);
+    padding-left:11px;transition:border-color .2s}
+  footer{margin-top:14px;font-size:12px;color:#667792;line-height:1.7}
+  @media (max-width:860px){ .main{grid-template-columns:1fr} aside{flex-direction:row;flex-wrap:wrap} .card{flex:1 1 130px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>补汽阀 95% THA 开点：用热耗换出力</h1>
+    <p>拖动滑块改变机组负荷，看 出力曲线、热耗曲线、补汽阀开度 三者如何联动 —— 静态图只能告诉你“结论”，这里你能自己试探边界。</p>
+  </header>
+
+  <div class="main">
+    <div class="chartwrap"><canvas id="chart"></canvas></div>
+    <aside>
+      <div class="card">
+        <div class="k">发电功率</div>
+        <div class="v" id="v-p">—<small>MW</small></div>
+        <div class="d" id="d-p">—</div>
+      </div>
+      <div class="card">
+        <div class="k">热耗率</div>
+        <div class="v" id="v-h">—<small>kJ/kWh</small></div>
+        <div class="d" id="d-h">—</div>
+      </div>
+      <div class="card">
+        <div class="k">补汽阀开度</div>
+        <div class="v" id="v-f">—<small>%</small></div>
+        <div class="d" id="d-f">—</div>
+      </div>
+      <div class="card gauge">
+        <canvas id="gauge"></canvas>
+        <div class="lab">补汽阀阀位</div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="ctl">
+    <div class="row">
+      <span>机组负荷</span>
+      <input id="sld" type="range" min="80" max="105" step="0.1" value="95">
+      <span class="val" id="xval">95.0 %</span>
+      <button id="btn95">跳到开点</button>
+      <button id="btn105">拉到顶峰</button>
+      <button id="btnplay">自动扫描</button>
+    </div>
+    <div class="judge" id="judge">—</div>
+  </div>
+
+  <footer>
+    数据口径：示意曲线。按 1000MW 级超超临界机组典型形态构造（补汽阀 95% THA 起开、105% 全开、补汽通路单位流量出力系数 0.85），
+    热耗基准 7350 kJ/kWh，非实测数据，仅用于说明“出力—热耗”耦合关系。<br>
+    纯前端单文件，无外部依赖，可离线打开；曲线与数字由同一模型计算，不存在图示与数值两张皮。
+  </footer>
+</div>
+
+<script>
+// ---------- 模型（唯一数据源） ----------
+const M = {
+  xmin: 80, xmax: 105,
+  hrRef: 7350,
+  power(x){ return x <= 95 ? 10 * x : 950 + 8.5 * (x - 95); },
+  hr(x){ return x <= 95 ? 7350 + 200 * Math.pow((95 - x) / 20, 1.2)
+                        : 7350 + 90 * Math.pow((x - 95) / 10, 1.1); },
+  valve(x){ return Math.min(100, Math.max(0, (x - 95) / 10 * 100)); }
+};
+
+// ---------- 画布 ----------
+const cvs = document.getElementById('chart');
+const ctx = cvs.getContext('2d');
+const gcv = document.getElementById('gauge');
+const gtx = gcv.getContext('2d');
+const W = 860, H = 470;            // CSS 逻辑尺寸
+const dpr = window.devicePixelRatio || 1;
+function fit(c, w, h){ c.width = w * dpr; c.height = h * dpr; c.style.width = w + 'px'; c.style.height = h + 'px';
+  c.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0); }
+fit(cvs, W, H); fit(gcv, 150, 110);
+
+const FONT = '"Microsoft YaHei","PingFang SC",system-ui,sans-serif';
+const C = { cy:'#38bdf8', am:'#f5a524', rd:'#f87171', dim:'#8fa0bf', grid:'#1e2942', txt:'#e8eefc', gn:'#34d399' };
+
+const PAD = { l: 56, r: 62, t: 26 };
+const PA = { y0: PAD.t, y1: 196 };          // 上：功率面板
+const PB = { y0: 236, y1: 406 };            // 下：热耗面板
+const AX = { x0: PAD.l, x1: W - PAD.r };
+
+const xPx = x => AX.x0 + (x - M.xmin) / (M.xmax - M.xmin) * (AX.x1 - AX.x0);
+const yr = (panel, v, lo, hi) => panel.y1 - (v - lo) / (hi - lo) * (panel.y1 - panel.y0);
+
+const P_LO = 680, P_HI = 1060, H_LO = 7300, H_HI = 7680;
+
+function line(x0, y0, x1, y1, color, w, dash){
+  ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = w || 1;
+  if (dash) ctx.setLineDash(dash);
+  ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); ctx.restore();
+}
+function txt(s, x, y, color, size, align, weight){
+  ctx.save(); ctx.fillStyle = color;
+  ctx.font = (weight || '') + ' ' + (size || 12) + 'px ' + FONT;
+  ctx.textAlign = align || 'left'; ctx.textBaseline = 'middle';
+  ctx.fillText(s, x, y); ctx.restore();
+}
+function dot(x, y, r, color){
+  ctx.save(); ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fillStyle = color; ctx.fill(); ctx.restore();
+}
+
+let x = 95;
+
+function drawChart(){
+  ctx.clearRect(0, 0, W, H);
+
+  // 补汽工作区底色
+  ctx.fillStyle = 'rgba(245,165,36,.07)';
+  ctx.fillRect(xPx(95), PA.y0, AX.x1 - xPx(95), PB.y1 - PA.y0);
+
+  // 网格 + 刻度
+  const xs = [80, 85, 90, 95, 100, 105];
+  xs.forEach(v => {
+    const gx = xPx(v);
+    line(gx, PA.y0, gx, PB.y1, v === 95 ? 'rgba(245,165,36,.55)' : C.grid, v === 95 ? 1.6 : 1, v === 95 ? [5, 4] : null);
+    txt(v, gx, PB.y1 + 16, C.dim, 11.5, 'center');
+  });
+  txt('机组负荷 / 主蒸汽流量（%）', (AX.x0 + AX.x1) / 2, PB.y1 + 40, C.dim, 12, 'center');
+
+  // 功率面板刻度
+  [700, 800, 900, 1000].forEach(v => {
+    const gy = yr(PA, v, P_LO, P_HI);
+    line(AX.x0, gy, AX.x1, gy, C.grid, 1);
+    txt(v, AX.x0 - 9, gy, C.dim, 11.5, 'right');
+  });
+
+  txt('发电功率（MW）', AX.x0 + 2, PA.y0 - 16, C.txt, 12.5, 'left', '600');
+
+  // 热耗面板刻度
+  [7300, 7400, 7500, 7600, 7700].forEach(v => {
+    const gy = yr(PB, v, H_LO, H_HI);
+    line(AX.x0, gy, AX.x1, gy, C.grid, 1);
+    txt(v, AX.x0 - 9, gy, C.dim, 11.5, 'right');
+  });
+
+  txt('热耗率（kJ/kWh）', AX.x0 + 2, PB.y0 - 16, C.txt, 12.5, 'left', '600');
+
+  // 基准虚线（95% 点的功率与热耗）
+  const p95 = M.power(95), h95 = M.hr(95);
+  line(AX.x0, yr(PA, p95, P_LO, P_HI), AX.x1, yr(PA, p95, P_LO, P_HI), 'rgba(56,189,248,.35)', 1, [4, 4]);
+  line(AX.x0, yr(PB, h95, H_LO, H_HI), AX.x1, yr(PB, h95, H_LO, H_HI), 'rgba(52,211,153,.35)', 1, [4, 4]);
+  txt('95% 点：' + p95.toFixed(0) + ' MW', AX.x1 - 4, yr(PA, p95, P_LO, P_HI) - 11, 'rgba(56,189,248,.85)', 11, 'right');
+  txt('95% 点：' + h95.toFixed(0) + ' kJ/kWh', AX.x1 - 4, yr(PB, h95, H_LO, H_HI) - 11, 'rgba(52,211,153,.85)', 11, 'right');
+
+  // 功率曲线
+  ctx.save(); ctx.beginPath();
+  for (let v = M.xmin; v <= M.xmax + 1e-6; v += 0.25){
+    const px = xPx(v), py = yr(PA, M.power(v), P_LO, P_HI);
+    v === M.xmin ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+  }
+  ctx.strokeStyle = C.cy; ctx.lineWidth = 2.4; ctx.stroke(); ctx.restore();
+
+  // 热耗曲线（分段着色）
+  const seg = (a, b, color) => {
+    ctx.save(); ctx.beginPath();
+    for (let v = a; v <= b + 1e-6; v += 0.25){
+      const px = xPx(v), py = yr(PB, M.hr(v), H_LO, H_HI);
+      v === a ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+    }
+    ctx.strokeStyle = color; ctx.lineWidth = 2.4; ctx.stroke(); ctx.restore();
+  };
+  seg(M.xmin, 95, C.gn); seg(95, M.xmax, C.am);
+
+  // 阀位指针
+  const cx = xPx(x);
+  line(cx, PA.y0, cx, PB.y1, 'rgba(232,238,252,.85)', 1.4, [3, 3]);
+
+  // 当前点
+  dot(cx, yr(PA, M.power(x), P_LO, P_HI), 5, C.cy);
+  dot(cx, yr(PB, M.hr(x), H_LO, H_HI), 5, x <= 95 ? C.gn : C.am);
+
+  // 标注：开点
+  const ox = xPx(95);
+  ctx.save(); ctx.beginPath(); ctx.arc(ox, PA.y0 + 1, 4, 0, 7); ctx.fillStyle = C.am; ctx.fill(); ctx.restore();
+  txt('95% THA  补汽阀开点', ox + 8, PA.y0 + 1, C.am, 12, 'left', '600');
+
+  // 当前值气泡
+  const bp = { x: cx, y: yr(PB, M.hr(x), H_LO, H_HI) };
+  const label = 'HR ' + M.hr(x).toFixed(0);
+  ctx.save();
+  ctx.font = '600 12px ' + FONT;
+  const tw = ctx.measureText(label).width + 16;
+  let bx = bp.x + 12; if (bx + tw > AX.x1) bx = bp.x - 12 - tw;
+  ctx.fillStyle = 'rgba(11,16,32,.92)'; ctx.strokeStyle = x <= 95 ? C.gn : C.am; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(bx, bp.y - 26, tw, 22, 7); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = x <= 95 ? C.gn : C.am; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+  ctx.fillText(label, bx + tw / 2, bp.y - 15);
+  ctx.restore();
+
+  // 区域说明
+  txt('补汽阀工作区（95% → 105%）', xPx(95) + 12, PB.y0 + 20, 'rgba(245,165,36,.95)', 12, 'left', '600');
+  txt('调节阀控量区', AX.x0 + 10, PB.y0 + 20, 'rgba(143,160,191,.95)', 12, 'left');
+}
+
+function drawGauge(){
+  const f = M.valve(x), w = 150, h = 110, r = 46, cx = w / 2, cy = 78;
+  gtx.clearRect(0, 0, w, h);
+  const a0 = Math.PI * 0.75, a1 = Math.PI * 2.25;
+  gtx.save(); gtx.lineWidth = 9; gtx.lineCap = 'round';
+  gtx.strokeStyle = '#1e2942'; gtx.beginPath(); gtx.arc(cx, cy, r, a0, a1); gtx.stroke();
+  gtx.strokeStyle = f > 0 ? C.am : '#2a3550';
+  gtx.beginPath(); gtx.arc(cx, cy, r, a0, a0 + (a1 - a0) * (f / 100)); gtx.stroke();
+  gtx.restore();
+  gtx.save(); gtx.fillStyle = C.txt; gtx.font = '700 20px ' + FONT; gtx.textAlign = 'center'; gtx.textBaseline = 'middle';
+  gtx.fillText(f.toFixed(0) + '%', cx, cy - 2);
+  gtx.fillStyle = C.dim; gtx.font = '11px ' + FONT;
+  gtx.fillText(f <= 0 ? '关闭' : (f >= 99.5 ? '全开' : '开启'), cx, cy + 20);
+  gtx.restore();
+}
+
+function update(){
+  document.getElementById('xval').textContent = x.toFixed(1) + ' %';
+  const P = M.power(x), H = M.hr(x), f = M.valve(x);
+  document.getElementById('v-p').innerHTML = P.toFixed(0) + '<small>MW</small>';
+  document.getElementById('v-h').innerHTML = H.toFixed(0) + '<small>kJ/kWh</small>';
+  document.getElementById('v-f').innerHTML = f.toFixed(0) + '<small>%</small>';
+
+  const dP = P - M.power(95), dH = H - M.hr(95);
+  document.getElementById('d-p').textContent = x <= 95
+    ? '较开点 ' + dP.toFixed(0) + ' MW'
+    : '较开点 +' + dP.toFixed(0) + ' MW（靠补汽）';
+  document.getElementById('d-h').textContent = dH < -8
+    ? '较开点 ' + dH.toFixed(0) + ' kJ/kWh（更低）'
+    : (Math.abs(dH) <= 8 ? '≈ 开点水平' : '较开点 +' + dH.toFixed(0) + ' kJ/kWh');
+  document.getElementById('d-f').textContent = f <= 0 ? '未开启：调节阀控量' : (f >= 99.5 ? '全开：热耗代价最陡' : '渐开：节流损失随开度增加');
+
+  const j = {
+    a: '调节阀控量区：负荷越低，进汽节流损失越大，热耗越高；这一段没有补汽介入，出力与流量基本线性。',
+    b: '补汽阀渐开区：主汽阀已全开，出力增量只能靠把主蒸汽节流后补进中压缸 —— 每一份出力都是用热耗买来的。',
+    c: '接近全开：补汽通路单位流量的做功能力低于主通路（0.85 系数），热耗上升斜率最陡，属短时顶峰用途。'
+  };
+  const box = document.getElementById('judge');
+  box.textContent = x <= 95 ? j.a : (x < 100 ? j.b : j.c);
+  box.style.borderLeftColor = x <= 95 ? C.gn : C.am;
+
+  drawChart(); drawGauge();
+}
+
+// ---------- 交互 ----------
+const sld = document.getElementById('sld');
+sld.addEventListener('input', e => { x = parseFloat(e.target.value); playing = false; update(); });
+document.getElementById('btn95').onclick = () => seek(95);
+document.getElementById('btn105').onclick = () => seek(105);
+function seek(v){ playing = false; document.getElementById('btnplay').classList.remove('on'); x = v; sld.value = v; update(); }
+
+let playing = false, raf = 0;
+document.getElementById('btnplay').onclick = function(){
+  playing = !playing; this.classList.toggle('on', playing);
+  if (!playing) { cancelAnimationFrame(raf); return; }
+  let t0 = null; const from = 80, to = 105, dur = 2600;
+  x = from; sld.value = from;
+  const step = ts => {
+    if (!playing) return;
+    if (t0 === null) t0 = ts;
+    const k = Math.min(1, (ts - t0) / dur);
+    x = from + (to - from) * (1 - Math.pow(1 - k, 2));
+    sld.value = x; update();
+    if (k < 1) raf = requestAnimationFrame(step); else { playing = false; document.getElementById('btnplay').classList.remove('on'); }
+  };
+  raf = requestAnimationFrame(step);
+};
+
+update();
+</script>
+</body>
+</html>
