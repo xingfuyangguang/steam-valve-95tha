@@ -43,6 +43,13 @@
   .judge{margin-top:11px;font-size:13px;line-height:1.65;color:#cbd6ea;border-left:3px solid var(--cy);
     padding-left:11px;transition:border-color .2s}
   footer{margin-top:14px;font-size:12px;color:#667792;line-height:1.7}
+  footer a,.vid a{color:var(--cy);text-decoration:none}
+  footer a:hover,.vid a:hover{text-decoration:underline}
+  .vid{margin-top:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .vid h2{margin:0 0 10px;font-size:15px;letter-spacing:.4px}
+  .vid .frame{background:#000;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
+  .vid video{width:100%;aspect-ratio:16/9;object-fit:contain;display:block;background:#000}
+  .vid .cap{margin:9px 0 0;font-size:12px;color:var(--dim);line-height:1.65}
   @media (max-width:860px){ .main{grid-template-columns:1fr} aside{flex-direction:row;flex-wrap:wrap} .card{flex:1 1 130px} }
 </style>
 </head>
@@ -88,6 +95,17 @@
       <button id="btnplay">自动扫描</button>
     </div>
     <div class="judge" id="judge">—</div>
+  </div>
+
+  <div class="vid">
+    <h2>动效版：24 秒走完整个开点过程</h2>
+    <div class="frame">
+      <video controls preload="metadata" playsinline poster="">
+        <source src="https://steam-valve-95tha.app.workbuddy.host/buji-valve-95tha.mp4?sharecode=2XF3LUJYSJ" type="video/mp4">
+        你的浏览器不支持内嵌视频，可直接下载 <a href="https://steam-valve-95tha.app.workbuddy.host/buji-valve-95tha.mp4?sharecode=2XF3LUJYSJ">buji-valve-95tha.mp4</a>。
+      </video>
+    </div>
+    <p class="cap">与上方交互图表同一套模型：负荷从 80% 推到 105%，补汽阀在 95% 处起开，热耗曲线斜率随开度变陡。 原片下载：<a href="https://steam-valve-95tha.app.workbuddy.host/buji-valve-95tha.mp4?sharecode=2XF3LUJYSJ" download>buji-valve-95tha.mp4（约 810 KB / 24 s）</a></p>
   </div>
 
   <footer>
